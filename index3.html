@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mini Project Manager (HTML/CSS/JS)</title>
+<style>
+  :root{
+    --accent:#2563eb; --muted:#6b7280; --bg:#f3f6fb; --card:#fff; --danger:#ef4444;
+    --success:#16a34a; --accent-2:#0369a1;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;background:var(--bg);color:#0f172a}
+  header{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .brand{font-weight:700;font-size:1.1rem}
+  nav{display:flex;gap:8px;align-items:center}
+  nav button{background:#fff;color:var(--accent);border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+  .container{max-width:1200px;margin:18px auto;padding:12px}
+  .grid{display:grid;grid-template-columns:300px 1fr;gap:18px}
+  .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+  h2{margin:0 0 12px 0;color:var(--accent)}
+  .small{font-size:13px;color:var(--muted)}
+  input,select,textarea{width:100%;padding:8px;border-radius:8px;border:1px solid #e6eef8;margin-top:8px}
+  button.primary{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid #e6eef8;padding:8px 12px;border-radius:8px;cursor:pointer}
+  /* Left column */
+  .left-col .section{margin-bottom:14px}
+  .user-list div{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;border:1px dashed #eef6ff;margin-bottom:8px}
+  .project-card{padding:10px;border-radius:8px;border:1px solid #eef6ff;margin-bottom:8px;cursor:pointer}
+  .project-card.active{box-shadow:0 6px 18px rgba(15,23,42,0.08);border-color:transparent}
+  /* Board */
+  .board{display:flex;gap:12px;align-items:flex-start}
+  .column{background:#f8fbff;border-radius:10px;padding:10px;flex:1;min-height:260px;max-height:72vh;overflow:auto}
+  .col-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .task{background:#fff;border-radius:8px;padding:10px;margin-bottom:10px;border-left:6px solid #e6eef8;cursor:grab}
+  .task.high{border-left-color:#ef4444}
+  .task.med{border-left-color:#f59e0b}
+  .task.low{border-left-color:#10b981}
+  .task.overdue{opacity:0.85;background:#fff4f4}
+  .task .meta{font-size:12px;color:var(--muted);margin-top:6px;display:flex;justify-content:space-between;gap:8px}
+  .progress{height:10px;background:#e6eef8;border-radius:20px;overflow:hidden}
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));width:0%}
+  /* Modal */
+  .modal{position:fixed;inset:0;background:rgba(2,6,23,0.45);display:none;align-items:center;justify-content:center;padding:18px;z-index:9999}
+  .modal.open{display:flex}
+  .modal .panel{background:#fff;border-radius:12px;padding:16px;max-width:640px;width:100%;max-height:90vh;overflow:auto}
+  /* responsive */
+  @media(max-width:900px){ .grid{grid-template-columns:1fr} .left-col{order:2} .right-col{order:1} .board{flex-direction:column} .column{max-height:none}}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;gap:12px;align-items:center">
+    <div class="brand">ProjManage — Mini Project Manager</div>
+    <div class="small">Create projects, assign tasks, track progress</div>
+  </div>
+  <nav>
+    <button onclick="showHome()">Home</button>
+    <button onclick="openNewProject()">+ New Project</button>
+    <button onclick="openNewTask()">+ New Task</button>
+    <button id="authBtn" onclick="toggleAuth()"></button>
+  </nav>
+</header>
+
+<main class="container">
+  <div class="grid">
+    <!-- LEFT -->
+    <div class="left-col">
+      <div class="card section">
+        <h2>Account</h2>
+        <div id="accountBox" class="small">Not signed in</div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="ghost" onclick="openAuthModal()">Login / Register</button>
+          <button class="ghost" onclick="seedDemo()">Seed Demo</button>
+        </div>
+      </div>
+
+      <div class="card section">
+        <h2>Users</h2>
+        <div class="small">Registered users (assignees)</div>
+        <div style="margin-top:8px">
+          <input id="newUserEmail" placeholder="email (for demo)" />
+          <input id="newUserName" placeholder="display name" />
+          <button class="primary" style="margin-top:8px" onclick="createUser()">Add User</button>
+        </div>
+        <div style="margin-top:10px" class="user-list" id="userList"></div>
+      </div>
+
+      <div class="card section">
+        <h2>Projects</h2>
+        <div class="small">Select a project to open its board</div>
+        <div id="projectList" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card section">
+        <h2>Filters</h2>
+        <div class="small">Quick filter & sort</div>
+        <label class="small">Assignee</label>
+        <select id="filterAssignee" onchange="renderBoard()"><option value="">All</option></select>
+        <label class="small">Priority</label>
+        <select id="filterPriority" onchange="renderBoard()"><option value="">All</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        <label class="small">Sort by</label>
+        <select id="sortTasks" onchange="renderBoard()"><option value="created">Created</option><option value="due">Due Date</option><option value="priority">Priority</option></select>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right-col">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <h2 id="boardTitle">No project selected</h2>
+            <div class="small" id="boardMeta">Create or open a project to manage tasks</div>
+          </div>
+          <div style="width:260px">
+            <div class="small">Progress</div>
+            <div class="progress" style="margin-top:8px"><i id="projectProgress" style="width:0%"></i></div>
+            <div class="small" style="text-align:right;margin-top:6px" id="progressText">0%</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px" id="boardArea">
+          <div class="small muted">Open a project to show task board</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- MODALS -->
+<div class="modal" id="modalAuth">
+  <div class="panel">
+    <h3>Login / Register</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="authEmail" placeholder="email"/>
+      <input id="authName" placeholder="display name (register)"/>
+      <input id="authPass" type="password" placeholder="password"/>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="primary" onclick="registerUser()">Register</button>
+      <button class="ghost" onclick="loginUser()">Login</button>
+      <button class="ghost" onclick="closeModal('modalAuth')">Close</button>
+    </div>
+    <p class="small" id="authMsg"></p>
+  </div>
+</div>
+
+<div class="modal" id="modalProject">
+  <div class="panel">
+    <h3 id="projModalTitle">New Project</h3>
+    <input id="projTitle" placeholder="Project title"/>
+    <textarea id="projDesc" rows="3" placeholder="Short description"></textarea>
+    <div style="margin-top:8px;display:flex;gap:8px">
+      <button class="primary" onclick="saveProject()">Save</button>
+      <button class="ghost" onclick="closeModal('modalProject')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modalTask">
+  <div class="panel">
+    <h3 id="taskModalTitle">New Task</h3>
+    <input id="taskTitle" placeholder="Task title"/>
+    <textarea id="taskDesc" rows="3" placeholder="Description (optional)"></textarea>
+    <label class="small">Assignee</label>
+    <select id="taskAssignee"><option value="">Unassigned</option></select>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <div style="flex:1"><label class="small">Priority</label><select id="taskPriority"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div>
+      <div style="flex:1"><label class="small">Due date</label><input id="taskDue" type="date"/></div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="primary" onclick="saveTask()">Save Task</button>
+      <button class="ghost" onclick="closeModal('modalTask')">Cancel</button>
+    </div>
+    <p class="small" id="taskMsg"></p>
+  </div>
+</div>
+
+<!-- TASK DETAILS -->
+<div class="modal" id="modalTaskView">
+  <div class="panel" id="taskViewPanel">
+    <!-- filled dynamically -->
+  </div>
+</div>
+
+<script>
+/* ---------- Storage keys & helpers ---------- */
+const LS_USERS = 'pm_users_v1';
+const LS_PROJECTS = 'pm_projects_v1';
+const LS_TASKS = 'pm_tasks_v1';
+const LS_SESSION = 'pm_session_v1';
+
+function read(key){ return JSON.parse(localStorage.getItem(key) || 'null'); }
+function write(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+function ensure(){ if(!read(LS_USERS)) write(LS_USERS, []); if(!read(LS_PROJECTS)) write(LS_PROJECTS, []); if(!read(LS_TASKS)) write(LS_TASKS, []); }
+function uid(){ return Date.now() + Math.floor(Math.random()*9999); }
+ensure();
+
+/* ---------- App state ---------- */
+let STATE = {
+  selectedProjectId: null,
+  editingTaskId: null,
+  editingProjectId: null
+};
+
+/* ---------- Auth ---------- */
+function updateAccountBox(){
+  const me = read(LS_SESSION);
+  const el = document.getElementById('accountBox');
+  const authBtn = document.getElementById('authBtn');
+  if(!me){ el.innerHTML = '<div class="small">Not signed in</div>'; authBtn.innerText = 'Login'; }
+  else { el.innerHTML = `<strong>${me.name || me.email}</strong><div class="small">${me.email}</div>`; authBtn.innerText = 'Logout'; }
+}
+updateAccountBox();
+
+function openAuthModal(){ document.getElementById('authMsg').innerText=''; openModal('modalAuth'); }
+function toggleAuth(){ const me = read(LS_SESSION); if(me) { logout(); } else openAuthModal(); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+
+function registerUser(){
+  const email = document.getElementById('authEmail').value.trim().toLowerCase();
+  const name = document.getElementById('authName').value.trim();
+  const pass = document.getElementById('authPass').value;
+  if(!email||!pass){ document.getElementById('authMsg').innerText='Enter email and password'; return; }
+  const users = read(LS_USERS);
+  if(users.some(u=>u.email===email)){ document.getElementById('authMsg').innerText='Email already registered'; return; }
+  users.push({ id: uid(), email, name: name || email.split('@')[0], pass });
+  write(LS_USERS, users);
+  write(LS_SESSION, { email, name: name || email.split('@')[0] });
+  document.getElementById('authMsg').innerText='Registered & logged in';
+  updateAccountBox(); closeModal('modalAuth'); refreshUsersUI();
+}
+
+function loginUser(){
+  const email = document.getElementById('authEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('authPass').value;
+  const users = read(LS_USERS);
+  const u = users.find(x=>x.email===email && x.pass===pass);
+  if(!u){ document.getElementById('authMsg').innerText='Invalid credentials'; return; }
+  write(LS_SESSION, { email: u.email, name: u.name, id: u.id });
+  document.getElementById('authMsg').innerText='Logged in';
+  updateAccountBox(); closeModal('modalAuth'); refreshUsersUI();
+}
+
+function logout(){ localStorage.removeItem(LS_SESSION); updateAccountBox(); }
+
+/* ---------- Users ---------- */
+function refreshUsersUI(){
+  const users = read(LS_USERS) || [];
+  const list = document.getElementById('userList'); list.innerHTML = '';
+  const sel = document.getElementById('filterAssignee'); sel.innerHTML = '<option value="">All</option>';
+  const taskSel = document.getElementById('taskAssignee'); if(taskSel) taskSel.innerHTML = '<option value="">Unassigned</option>';
+  users.forEach(u=>{
+    const d = document.createElement('div');
+    d.innerHTML = `<div>${u.name} <div class="small">${u.email}</div></div><div style="display:flex;gap:6px"><button class="ghost" onclick="removeUser('${u.id}')">Delete</button></div>`;
+    list.appendChild(d);
+    const o = document.createElement('option'); o.value = u.id; o.textContent = u.name; sel.appendChild(o); if(taskSel) taskSel.appendChild(o.cloneNode(true));
+  });
+}
+refreshUsersUI();
+
+function createUser(){
+  const email = document.getElementById('newUserEmail').value.trim().toLowerCase();
+  const name = document.getElementById('newUserName').value.trim();
+  if(!email||!name){ alert('Enter name and email'); return; }
+  const users = read(LS_USERS);
+  if(users.some(u=>u.email===email)){ alert('User already exists'); return; }
+  users.push({ id: uid(), email, name, pass: 'demo' });
+  write(LS_USERS, users);
+  document.getElementById('newUserEmail').value=''; document.getElementById('newUserName').value='';
+  refreshUsersUI();
+}
+
+function removeUser(id){
+  if(!confirm('Delete user?')) return;
+  let users = read(LS_USERS) || []; users = users.filter(u=>u.id!==id); write(LS_USERS, users); refreshUsersUI();
+}
+
+/* ---------- Projects ---------- */
+function refreshProjectsUI(){
+  const projects = read(LS_PROJECTS) || [];
+  const el = document.getElementById('projectList'); el.innerHTML = '';
+  projects.forEach(p=>{
+    const div = document.createElement('div');
+    div.className = 'project-card' + (STATE.selectedProjectId===p.id ? ' active' : '');
+    div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div><strong>${p.title}</strong><div class="small">${p.desc||''}</div></div>
+      <div style="display:flex;gap:6px">
+        <button class="ghost" onclick="openEditProject('${p.id}');event.stopPropagation()">Edit</button>
+        <button class="ghost" onclick="deleteProject('${p.id}');event.stopPropagation()">Delete</button>
+      </div>
+    </div>`;
+    div.onclick = ()=> openProject(p.id);
+    el.appendChild(div);
+  });
+}
+refreshProjectsUI();
+
+function openNewProject(){ document.getElementById('projModalTitle').innerText='New Project'; document.getElementById('projTitle').value=''; document.getElementById('projDesc').value=''; STATE.editingProjectId=null; openModal('modalProject'); }
+function openEditProject(id){
+  const projects = read(LS_PROJECTS) || []; const p = projects.find(x=>x.id===id);
+  if(!p) return;
+  STATE.editingProjectId = id;
+  document.getElementById('projModalTitle').innerText='Edit Project';
+  document.getElementById('projTitle').value = p.title; document.getElementById('projDesc').value = p.desc || '';
+  openModal('modalProject');
+}
+function saveProject(){
+  const title = document.getElementById('projTitle').value.trim();
+  const desc = document.getElementById('projDesc').value.trim();
+  if(!title){ alert('Enter title'); return; }
+  const projects = read(LS_PROJECTS) || [];
+  if(STATE.editingProjectId){
+    const p = projects.find(x=>x.id===STATE.editingProjectId); p.title=title; p.desc=desc;
+  } else {
+    projects.unshift({ id: uid(), title, desc, created: Date.now() });
+  }
+  write(LS_PROJECTS, projects);
+  closeModal('modalProject'); refreshProjectsUI();
+}
+function deleteProject(id){
+  if(!confirm('Delete project and its tasks?')) return;
+  let projects = read(LS_PROJECTS)||[]; projects = projects.filter(p=>p.id!==id); write(LS_PROJECTS, projects);
+  // remove tasks for project
+  let tasks = read(LS_TASKS)||[]; tasks = tasks.filter(t=>t.projectId!==id); write(LS_TASKS, tasks);
+  if(STATE.selectedProjectId===id) STATE.selectedProjectId=null;
+  refreshProjectsUI(); renderBoard();
+}
+function openProject(id){ STATE.selectedProjectId = id; refreshProjectsUI(); renderBoard(); }
+
+/* ---------- Tasks ---------- */
+function openNewTask(){
+  if(!STATE.selectedProjectId){ alert('Open a project first'); return; }
+  STATE.editingTaskId = null;
+  document.getElementById('taskModalTitle').innerText='New Task';
+  document.getElementById('taskTitle').value=''; document.getElementById('taskDesc').value='';
+  document.getElementById('taskPriority').value='medium'; document.getElementById('taskDue').value='';
+  document.getElementById('taskMsg').innerText='';
+  openModal('modalTask');
+}
+
+function saveTask(){
+  const title = document.getElementById('taskTitle').value.trim();
+  if(!title){ document.getElementById('taskMsg').innerText='Enter task title'; return; }
+  const desc = document.getElementById('taskDesc').value.trim();
+  const assignee = document.getElementById('taskAssignee').value || null;
+  const priority = document.getElementById('taskPriority').value || 'medium';
+  const due = document.getElementById('taskDue').value || null;
+  let tasks = read(LS_TASKS) || [];
+  if(STATE.editingTaskId){
+    const t = tasks.find(x=>x.id===STATE.editingTaskId);
+    Object.assign(t, { title, desc, assignee, priority, due });
+  } else {
+    tasks.unshift({ id: uid(), projectId: STATE.selectedProjectId, title, desc, assignee, priority, due, status: 'todo', created: Date.now() });
+  }
+  write(LS_TASKS, tasks);
+  closeModal('modalTask'); renderBoard();
+}
+
+function renderBoard(){
+  const pid = STATE.selectedProjectId;
+  const area = document.getElementById('boardArea');
+  if(!pid){ area.innerHTML = '<div class="small muted">No project selected. Create or open a project.</div>'; document.getElementById('boardTitle').innerText='No project selected'; document.getElementById('boardMeta').innerText=''; updateProgress(0,0); return; }
+  const projects = read(LS_PROJECTS) || []; const proj = projects.find(p=>p.id===pid);
+  document.getElementById('boardTitle').innerText = proj.title;
+  document.getElementById('boardMeta').innerText = proj.desc || '—';
+  // filters
+  const filterAssignee = document.getElementById('filterAssignee').value;
+  const filterPriority = document.getElementById('filterPriority').value;
+  const sortBy = document.getElementById('sortTasks').value;
+  // tasks
+  let tasks = (read(LS_TASKS) || []).filter(t=>t.projectId===pid);
+  if(filterAssignee) tasks = tasks.filter(t=>t.assignee===filterAssignee);
+  if(filterPriority) tasks = tasks.filter(t=>t.priority===filterPriority);
+  // sort
+  if(sortBy==='due') tasks.sort((a,b)=> (a.due||'').localeCompare(b.due||''));
+  else if(sortBy==='priority') tasks.sort((a,b)=> ({high:0,medium:1,low:2}[a.priority] - ({high:0,medium:1,low:2}[b.priority])));
+  else tasks.sort((a,b)=> b.created - a.created);
+  // group by status
+  const groups = { todo:[], 'in-progress':[], done:[] };
+  tasks.forEach(t=> groups[t.status].push(t));
+  // build columns with drag & drop
+  area.innerHTML = `<div class="board">
+    ${['todo','in-progress','done'].map(s=>`
+      <div class="column" data-status="${s}" ondragover="onDragOver(event)" ondrop="onDrop(event,'${s}')">
+        <div class="col-header"><div><strong>${s==='todo'?'To Do':s==='in-progress'?'In Progress':'Done'}</strong></div><div class="small">${groups[s].length}</div></div>
+        ${groups[s].map(t=>taskCardHtml(t)).join('')}
+      </div>
+    `).join('')}
+  </div>`;
+  // after rendering update event listeners
+  updateProgress(tasks.filter(t=>t.status==='done').length, tasks.length);
+  // attach draggable handlers
+  document.querySelectorAll('.task').forEach(el=>{
+    el.addEventListener('dragstart', e=> {
+      e.dataTransfer.setData('text/plain', el.dataset.id);
+    });
+  });
+}
+
+function taskCardHtml(t){
+  const users = read(LS_USERS) || [];
+  const assigneeName = users.find(u=>u.id===t.assignee)?.name || (t.assignee? 'Unknown' : 'Unassigned');
+  const dueText = t.due ? `Due: ${t.due}` : '';
+  const isOverdue = t.due && (new Date(t.due) < (new Date()).setHours(0,0,0,0)) && t.status!=='done';
+  return `
+    <div class="task ${t.priority==='high' ? 'high' : t.priority==='medium' ? 'med' : 'low'} ${isOverdue ? 'overdue' : ''}" draggable="true" data-id="${t.id}" onclick="viewTask('${t.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><strong>${escapeHtml(t.title)}</strong></div>
+        <div style="display:flex;gap:6px">
+          <button class="ghost" onclick="editTask('${t.id}');event.stopPropagation()" style="border:none;background:transparent;cursor:pointer">✎</button>
+          <button class="ghost" onclick="deleteTask('${t.id}');event.stopPropagation()" style="border:none;background:transparent;cursor:pointer">🗑</button>
+        </div>
+      </div>
+      <div class="meta"><div>${assigneeName}</div><div>${dueText}</div></div>
+    </div>
+  `;
+}
+
+function editTask(id){
+  const tasks = read(LS_TASKS) || []; const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  STATE.editingTaskId = id;
+  document.getElementById('taskModalTitle').innerText='Edit Task';
+  document.getElementById('taskTitle').value = t.title; document.getElementById('taskDesc').value = t.desc || '';
+  document.getElementById('taskAssignee').value = t.assignee || '';
+  document.getElementById('taskPriority').value = t.priority || 'medium';
+  document.getElementById('taskDue').value = t.due || '';
+  openModal('modalTask');
+}
+
+function deleteTask(id){
+  if(!confirm('Delete task?')) return;
+  let tasks = read(LS_TASKS) || []; tasks = tasks.filter(t=>t.id!==id); write(LS_TASKS, tasks); renderBoard();
+}
+
+function viewTask(id){
+  const tasks = read(LS_TASKS) || []; const t = tasks.find(x=>x.id===id); if(!t) return;
+  const users = read(LS_USERS) || []; const assigneeName = users.find(u=>u.id===t.assignee)?.name || 'Unassigned';
+  const html = `
+    <div style="display:flex;justify-content:space-between;align-items:center"><h3>${escapeHtml(t.title)}</h3><div><button onclick="closeModal('modalTaskView')" class="ghost">Close</button></div></div>
+    <div class="small muted">Status: ${t.status}</div>
+    <p style="margin-top:10px">${escapeHtml(t.desc||'No description')}</p>
+    <div class="small" style="margin-top:8px">Assignee: ${assigneeName}</div>
+    <div class="small">Priority: ${t.priority}</div>
+    <div class="small">Due: ${t.due || '—'}</div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="primary" onclick="toggleComplete('${t.id}')">${t.status==='done'?'Mark Incomplete':'Mark Done'}</button>
+      <button class="ghost" onclick="editTask('${t.id}')">Edit</button>
+      <button class="ghost" onclick="deleteTask('${t.id}')">Delete</button>
+    </div>
+  `;
+  document.getElementById('taskViewPanel').innerHTML = html;
+  openModal('modalTaskView');
+}
+
+function toggleComplete(id){
+  const tasks = read(LS_TASKS) || []; const t = tasks.find(x=>x.id===id); if(!t) return;
+  t.status = t.status==='done' ? 'todo' : 'done'; write(LS_TASKS, tasks); closeModal('modalTaskView'); renderBoard();
+}
+
+/* ---------- Drag & Drop ---------- */
+function onDragOver(e){ e.preventDefault(); }
+function onDrop(e, status){
+  const id = e.dataTransfer.getData('text/plain');
+  let tasks = read(LS_TASKS) || []; const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  t.status = status; write(LS_TASKS, tasks); renderBoard();
+}
+
+/* ---------- Progress ---------- */
+function updateProgress(doneCount, total){
+  const percent = total===0?0: Math.round((doneCount/total)*100);
+  document.getElementById('projectProgress').style.width = percent + '%';
+  document.getElementById('progressText').innerText = percent + '%';
+}
+
+/* ---------- Helpers ---------- */
+function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+
+/* ---------- Seed demo data ---------- */
+function seedDemo(){
+  if(confirm('Seed demo users, project & tasks? This will not overwrite existing data.')) {
+    const users = read(LS_USERS) || [];
+    if(!users.some(u=>u.email==='alice@demo.com')) users.push({id:uid(),email:'alice@demo.com',name:'Alice',pass:'pass'});
+    if(!users.some(u=>u.email==='bob@demo.com')) users.push({id:uid(),email:'bob@demo.com',name:'Bob',pass:'pass'});
+    write(LS_USERS, users);
+
+    const projects = read(LS_PROJECTS) || [];
+    if(projects.length===0){
+      const pid = uid();
+      projects.push({id:pid,title:'Website Redesign',desc:'Redesign marketing site',created:Date.now()});
+      write(LS_PROJECTS, projects);
+      const tasks = read(LS_TASKS) || [];
+      tasks.push({id:uid(),projectId:pid,title:'Wireframes',desc:'Create homepage wireframes',assignee:users[0].id,priority:'high',due:dateAdd(3),status:'todo',created:Date.now()});
+      tasks.push({id:uid(),projectId:pid,title:'Implement header',desc:'Build header and navbar',assignee:users[1].id,priority:'medium',due:dateAdd(7),status:'in-progress',created:Date.now()});
+      tasks.push({id:uid(),projectId:pid,title:'QA and testing',desc:'Cross browser testing',assignee:null,priority:'low',due:dateAdd(12),status:'todo',created:Date.now()});
+      write(LS_TASKS, tasks);
+    }
+    refreshUsersUI(); refreshProjectsUI(); renderBoard(); alert('Demo seeded. Login as alice@demo.com / pass to test auth.');
+  }
+}
+function dateAdd(days){ const d=new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+
+/* ---------- On load / init ---------- */
+function showHome(){ STATE.selectedProjectId=null; refreshProjectsUI(); renderBoard(); }
+function openEditProject(id){ /* implemented above */ }
+
+/* update UI initially */
+refreshUsersUI(); refreshProjectsUI(); renderBoard(); updateAccountBox();
+
+/* fill task assignee select when modal opens */
+document.getElementById('modalTask').addEventListener('click', e=>{ /* stop click through */ });
+document.getElementById('modalTask').addEventListener('transitionend', ()=>{});
+document.querySelectorAll('.modal').forEach(m=>{
+  m.addEventListener('click', (e)=>{ if(e.target===m) closeModal(m.id); });
+});
+
+// set up hook: when modalTask opens, refresh assignee list
+const obs = new MutationObserver(()=> {
+  if(document.getElementById('modalTask').classList.contains('open')){
+    const sel = document.getElementById('taskAssignee'); sel.innerHTML = '<option value="">Unassigned</option>';
+    (read(LS_USERS)||[]).forEach(u=>{ const o=document.createElement('option'); o.value=u.id; o.textContent=u.name; sel.appendChild(o); });
+  }
+});
+obs.observe(document.getElementById('modalTask'), { attributes:true, attributeFilter:['class'] });
+
+/* helper to render board when filters change */
+['filterAssignee','filterPriority','sortTasks'].forEach(id=> document.getElementById(id).addEventListener('change', renderBoard));
+
+</script>
+</body>
+</html>
